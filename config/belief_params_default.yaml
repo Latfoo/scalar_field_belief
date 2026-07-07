@@ -21,6 +21,10 @@
 
     refit_policy: every_measurement
     refit_every_k: 1
+    # if false, init_lengthscale_x/y, init_outputscale, and init_noise stay
+    # fixed (no Adam training loop); the posterior still updates on every
+    # refit since the GP is rebuilt against all current measurements
+    optimize_hyperparameters: false
 
 
     # visualization 

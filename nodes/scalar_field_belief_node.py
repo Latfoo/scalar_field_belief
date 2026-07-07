@@ -188,6 +188,9 @@ class ScalarFieldBeliefNode(Node):
         )
         self.declare_parameter('refit_every_k', 1, self._static_descriptor())
         self.declare_parameter(
+            'optimize_hyperparameters', True, self._static_descriptor()
+        )
+        self.declare_parameter(
             'publish_visualization', True, self._static_descriptor()
         )
         self.declare_parameter(
@@ -351,6 +354,9 @@ class ScalarFieldBeliefNode(Node):
             init_noise=float(self.get_parameter('init_noise').value),
             refit_policy=self.get_parameter('refit_policy').value,
             refit_every_k=int(self.get_parameter('refit_every_k').value),
+            optimize_hyperparameters=bool(
+                self.get_parameter('optimize_hyperparameters').value
+            ),
             publish_visualization=bool(
                 self.get_parameter('publish_visualization').value
             ),

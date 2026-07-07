@@ -265,11 +265,16 @@ class ScalarFieldBelief:
         return mean.detach().cpu().numpy(), covar.detach().cpu().numpy()
 
     def _fit_model(self) -> None:
-        """Fit a fresh exact GP to all currently stored measurements.
+        """Rebuild the exact GP against all currently stored measurements.
 
-        The current implementation rebuilds the exact GP from scratch whenever a
-        refit is triggered. This is simple and robust for small domains, but it
-        is not intended as a scalable online GP update method. -> Future work.
+        The exact GP is always rebuilt from scratch whenever a refit is
+        triggered. This is simple and robust for small domains, but it is not
+        intended as a scalable online GP update method. -> Future work.
+
+        If `config.optimize_hyperparameters` is `False`, the kernel
+        hyperparameters stay fixed at their `init_*` values (no Adam
+        training loop) and only the training data changes, so the posterior
+        is conditioned on the new data without ever re-optimizing the prior.
         """
         train_x, train_y = self._build_train_tensors()
 
@@ -294,19 +299,20 @@ class ScalarFieldBelief:
             init_noise=self.config.init_noise,
         )
 
-        model.train()
-        likelihood.train()
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=self.config.learning_rate
-        )
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
+        if self.config.optimize_hyperparameters:
+            model.train()
+            likelihood.train()
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=self.config.learning_rate
+            )
+            mll = gpytorch.mlls.ExactMarginalLogLikelihood(likelihood, model)
 
-        for _ in range(self.config.training_iter):
-            optimizer.zero_grad()
-            output = model(train_x)
-            loss = -mll(output, train_y)
-            loss.backward()
-            optimizer.step()
+            for _ in range(self.config.training_iter):
+                optimizer.zero_grad()
+                output = model(train_x)
+                loss = -mll(output, train_y)
+                loss.backward()
+                optimizer.step()
 
         self.model = model
         self.likelihood = likelihood
