@@ -264,6 +264,24 @@ class ScalarFieldBelief:
         covar = self.standardizer.inverse_transform_covar(covar_norm)
         return mean.detach().cpu().numpy(), covar.detach().cpu().numpy()
 
+    def measurement_noise_variance(self) -> float:
+        """Return the GP likelihood noise variance (sigma_n^2) in physical
+        measurement units.
+
+        Raises
+        ------
+        RuntimeError
+            If no fitted model is available yet.
+        """
+        if not self.has_model():
+            raise RuntimeError('Belief has no fitted model yet.')
+
+        assert self.likelihood is not None
+        assert self.standardizer is not None
+
+        noise_norm = self.likelihood.noise.detach()
+        return float((noise_norm * self.standardizer.std**2).item())
+
     def _fit_model(self) -> None:
         """Rebuild the exact GP against all currently stored measurements.
 

@@ -491,6 +491,9 @@ class ScalarFieldBeliefNode(Node):
         response.success = True
         response.mean = mean.tolist()
         response.covariance_matrix = covariance.flatten().tolist()
+        response.measurement_noise_variance = (
+            self.belief.measurement_noise_variance()
+        )
         response.status_message = 'ok'
         return response
 
