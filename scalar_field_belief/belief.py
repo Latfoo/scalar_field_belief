@@ -116,6 +116,9 @@ class ScalarFieldBelief:
         self.new_since_last_fit += 1
 
         did_refit = self.maybe_refit()
+        if not did_refit and self.has_model():
+            self._condition_on_data()
+
         return FitResult(
             did_refit=did_refit, num_measurements=len(self.y_train)
         )
@@ -282,6 +285,27 @@ class ScalarFieldBelief:
         noise_norm = self.likelihood.noise.detach()
         return float((noise_norm * self.standardizer.std**2).item())
 
+    def _condition_on_data(self) -> None:
+        """Update the current model's conditioning set from all stored measurements.
+
+        Unlike `_fit_model`, this does not rebuild the model and does not
+        touch kernel or likelihood hyperparameters. It does recompute the
+        target standardizer from all current measurements (a cheap mean/std
+        recompute, not a gradient-based operation): freezing the
+        standardizer between refits previously caused a severe scale
+        mismatch once the model's fixed `init_outputscale`/`init_noise`
+        (defined in standardized target units) were interpreted against a
+        stale standardizer fit from very few points. Recomputing it here on
+        every measurement, while leaving kernel hyperparameters untouched,
+        keeps posterior queries reflecting every measurement between
+        refits, while `refit_policy`/`refit_every_k` continue to control
+        only the (expensive) hyperparameter re-optimization cadence.
+        """
+        assert self.model is not None
+
+        train_x, train_y = self._build_train_tensors()
+        self.model.set_train_data(inputs=train_x, targets=train_y, strict=False)
+
     def _fit_model(self) -> None:
         """Rebuild the exact GP against all currently stored measurements.
 
@@ -293,6 +317,13 @@ class ScalarFieldBelief:
         hyperparameters stay fixed at their `init_*` values (no Adam
         training loop) and only the training data changes, so the posterior
         is conditioned on the new data without ever re-optimizing the prior.
+
+        Between refits, `_condition_on_data` keeps the existing model
+        conditioned on newly added measurements without rebuilding the model
+        or touching its kernel/likelihood hyperparameters; this method is
+        only reached when the refit policy actually fires, and additionally
+        (re-)optimizes those hyperparameters when `optimize_hyperparameters`
+        is `True`.
         """
         train_x, train_y = self._build_train_tensors()
 
@@ -338,9 +369,9 @@ class ScalarFieldBelief:
     def _build_train_tensors(self) -> tuple[torch.Tensor, torch.Tensor]:
         """Build normalized training inputs and standardized training targets.
 
-        This method is used only during fitting. It also updates
-        `self.standardizer`, because target standardization is part of the
-        fitted training state.
+        This method is used by both `_fit_model` and `_condition_on_data`. It
+        also updates `self.standardizer`, because target standardization is
+        recomputed from all current measurements every time this is called.
         """
         if len(self.y_train) == 0:
             raise RuntimeError('Cannot build tensors without training data.')

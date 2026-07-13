@@ -400,7 +400,7 @@ class ScalarFieldBeliefNode(Node):
                 f'Received measurement at ({x:.3f}, {y:.3f}) = {value:.6f}; '
                 f'N={result.num_measurements}, refit={result.did_refit}'
             )
-            if result.did_refit and self.config.publish_visualization:
+            if self.belief.has_model() and self.config.publish_visualization:
                 self._publish_visualization()
         except Exception as exc:
             self.get_logger().error(

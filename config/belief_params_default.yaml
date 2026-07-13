@@ -19,12 +19,12 @@
     init_outputscale: 1.0
     init_noise: 0.01
 
-    refit_policy: every_measurement
-    refit_every_k: 1
+    refit_policy: every_k_measurements
+    refit_every_k: 15
     # if false, init_lengthscale_x/y, init_outputscale, and init_noise stay
     # fixed (no Adam training loop); the posterior still updates on every
     # refit since the GP is rebuilt against all current measurements
-    optimize_hyperparameters: false
+    optimize_hyperparameters: true
 
 
     # visualization 
