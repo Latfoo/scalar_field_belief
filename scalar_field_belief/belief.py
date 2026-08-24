@@ -285,6 +285,34 @@ class ScalarFieldBelief:
         noise_norm = self.likelihood.noise.detach()
         return float((noise_norm * self.standardizer.std**2).item())
 
+    def fitted_hyperparameters_physical(self) -> dict[str, float]:
+        """Return the currently fitted GP kernel hyperparameters in physical
+        units: lengthscale_x_m/lengthscale_y_m (meters, via the domain
+        extent), outputscale (measurement units squared, via
+        standardizer.std**2 - same convention as measurement_noise_variance()),
+        and noise_variance (measurement units squared).
+
+        Raises
+        ------
+        RuntimeError
+            If no fitted model is available yet.
+        """
+        if not self.has_model():
+            raise RuntimeError('Belief has no fitted model yet.')
+        assert self.model is not None
+        assert self.standardizer is not None
+
+        lengthscale_norm = self.model.covar_module.base_kernel.lengthscale.detach()
+        x_extent = self.normalizer.x_max - self.normalizer.x_min
+        y_extent = self.normalizer.y_max - self.normalizer.y_min
+        std2 = float(self.standardizer.std**2)
+        return {
+            'lengthscale_x_m': float(lengthscale_norm[0, 0]) * x_extent,
+            'lengthscale_y_m': float(lengthscale_norm[0, 1]) * y_extent,
+            'outputscale': float(self.model.covar_module.outputscale.detach()) * std2,
+            'noise_variance': self.measurement_noise_variance(),
+        }
+
     def _condition_on_data(self) -> None:
         """Update the current model's conditioning set from all stored measurements.
 
